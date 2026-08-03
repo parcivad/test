@@ -1,0 +1,40 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f1115;
+  color: #e6e6e6;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+}
+
+p {
+  margin: 0 0 2rem;
+  color: #9aa0a6;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font: inherit;
+  color: #0f1115;
+  background: #e6e6e6;
+  border: 0;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #ffffff;
+}
