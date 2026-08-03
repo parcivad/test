@@ -1,6 +1,21 @@
+# deps
 node_modules/
+
+# generated content
+.source
+
+# test & build
 .next/
 out/
-.env*.local
-*.log
+build/
+*.tsbuildinfo
+
+# misc
 .DS_Store
+*.pem
+*.log
+
+# others
+.env*.local
+.vercel
+next-env.d.ts
