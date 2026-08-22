@@ -1,21 +1,23 @@
-# deps
+# Node
 node_modules/
-
-# generated content
-.source
-
-# test & build
 .next/
-out/
-build/
+dist/
 *.tsbuildinfo
 
-# misc
-.DS_Store
-*.pem
-*.log
+# Rust
+target/
 
-# others
-.env*.local
-.vercel
-next-env.d.ts
+# C++
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+
+# Umgebung — .env.example gehoert INS Repo, .env nie.
+.env
+.env.local
+.env.*.local
