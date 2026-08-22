@@ -4,9 +4,10 @@
 
 /// Was dieser Dienst aus der Umgebung braucht.
 ///
-/// Die Werte stehen in `.env.example` — und zwar nicht aus Bequemlichkeit:
-/// die Vollanalyse liest keine `.cpp`- und `.h`-Dateien. Ohne die
-/// `.env.example` bliebe diese Konfiguration unsichtbar.
+/// Die Werte stehen zusaetzlich in `.env.example` — fuer Menschen, und
+/// weil `wert()` den Namen als Parameter durchreicht: `getenv(name)`
+/// traegt keinen Namen, den eine Analyse lesen koennte. Nur
+/// `DATABASE_URL` steht woertlich im Quelltext.
 struct Config {
     std::string database_url;  ///< DATABASE_URL, ohne Vorgabewert
     std::uint16_t port;        ///< API_CPP_PORT, Vorgabe 8083

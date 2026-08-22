@@ -14,42 +14,55 @@ Ein Prüfstand für die Erkennung: acht Apps in sechs Sprachen, verteilt
 | `services/api-python` | Python | `pyproject.toml` | `PYTHON_API_PORT`, Port 8084 |
 | `packages/ui` | TypeScript | `package.json` | gemeinsame Komponenten |
 
-## Was hier absichtlich schiefgeht
+## Was dieser Prüfstand zutage gefördert hat
 
-Der Prüfstand ist nicht nur dafür da, zu zeigen, dass es klappt.
+Am 22.08.2026 gegen den echten Void gefahren. Drei Apps hatten einen
+**leeren** Vorschlag — null Variablen, null Ports, null Datenbanken —,
+obwohl alles davon in der Datei nebenan stand:
 
-**Die Vollanalyse liest `.rs` und `.cpp` nicht.** Sie sucht Umgebungs-
-variablen als `process.env.X` und `os.environ['X']`, und nur in
-`*.js *.ts *.jsx *.tsx *.mjs *.py *.go *.env*`. Ports findet sie über
-`listen(NNNN` in denselben Dateien. Ein Rust- oder C++-Server wird also
-als App **erkannt**, seine Konfiguration aber **nicht gefunden** — obwohl
-sie danebensteht.
+| App | vorher | nachher |
+|---|---|---|
+| `apps/api-cpp` | 0 / 0 / 0 | **4 / 1 / 1** |
+| `apps/api-rust` | 0 / 0 / 0 | **5 / 1 / 1** |
+| `services/api-python` | 3 / 0 / 0 | **3 / 1 / 1** |
 
-`apps/api-rust` und `apps/api-cpp` tragen trotzdem eine `.env.example`.
-Sie hilft der Analyse **nicht** — nachgemessen, nicht vermutet:
+*(Variablen / Ports / Datenbanken)*
 
-```
-$ find apps/api-rust -name '*.env*'
-apps/api-rust/.env.example          ← die Datei WIRD gefunden
-$ grep -c 'process\.env\.' apps/api-rust/.env.example
-0                                    ← und kein Muster greift darin
-```
+Drei Ursachen, alle im Raptor behoben (`1dc9f9b`):
 
-Die Datei landet in der Dateiliste, aber die beiden Muster suchen
-Code-Formen. `DATABASE_URL=…` trifft keines. `*.env*` steht damit in der
-Liste, ohne dass irgendetwas es liest. Die `.env.example` ist hier für
-Menschen da, nicht für die Analyse.
+1. **`.rs` und `.cpp` standen nicht in der Dateiliste.** Sie wurden nie
+   durchsucht. Ein Rust- oder C++-Server wurde als App *erkannt* und
+   danach zu null analysiert — für den Betrachter sah das aus wie „diese
+   App hat keine Konfiguration".
+2. **Die Muster kannten nur JS und Python.** Jetzt auch `env::var` /
+   `env::var_os` (Rust), `getenv` (C/C++), `os.environ.get` und
+   `os.getenv` (Python), `os.Getenv` (Go).
+3. **`.env*` stand seit jeher in der Liste und wurde von keinem Muster
+   gelesen.** Die anderen suchen *Aufrufe*, und `NAME=value` ist keiner.
+   Eine `.env.example` mit vier Zeilen ergab null Funde.
 
-**`os.environ.get()` wird nicht gefunden.** Das Muster trifft nur die
-Klammerform `os.environ['NAME']`. `services/api-python` benutzt deshalb
-durchweg die Klammerform — mit `.get()` bekäme man eine Variable, die
-niemandem vorgeschlagen wird.
+Ports fanden sich nur über `listen(NNNN` — die Node-Form und sonst fast
+nichts. Jetzt dazu das Tupel `("host", NNNN)` (Python, Rust),
+`htons(NNNN)` (C) und aus einer `.env` jeder Name mit `PORT` darin.
 
-**Die Analyse liest auch Kommentare.** Beim ersten Bau dieses Repos stand
-`os.environ['X']` in einem Docstring, und die Analyse schlug prompt eine
-Variable namens `X` vor. Sie greppt Text, nicht Syntax.
+## Was weiterhin gilt
 
-**Die Wurzel zählt mit.** Diese `package.json` macht das Repo zu einem
+**Die Analyse greppt Text, nicht Syntax.** Beim Bau dieses Repos stand
+`os.environ['X']` in einem Doc-Kommentar — und die Analyse schlug prompt
+eine Variable namens `X` vor. Wer in einem Kommentar ein Muster zitiert,
+bekommt es als Fund zurück.
+
+**Ein Name, der durch eine Variable geht, ist unsichtbar.**
+`apps/api-cpp` liest drei seiner vier Werte über einen Helfer
+`wert(name, vorgabe)` — dort steht `getenv(name)`, und `name` ist kein
+Name, den man lesen kann. Nur `DATABASE_URL` steht wörtlich im
+Quelltext; die anderen drei kommen aus der `.env.example`.
+
+**`apps/docs` hat keinen Port.** Das ist richtig: Next.js nimmt ohne
+Angabe 3000, und diese Zahl steht nirgends im Repo. Was nicht
+dasteht, kann nicht gefunden werden.
+
+****Die Wurzel zählt mit.** Diese `package.json` macht das Repo zu einem
 npm-Workspace — und die Erkennung meldet die Wurzel deshalb als eigene
 App (`javascript`). Das ist kein Fehler, sondern die Regel: wo eine
 `package.json` liegt, ist eine App.

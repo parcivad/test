@@ -4,9 +4,14 @@ Die beiden Skripte, die der Raptor in seiner Zelle laufen lässt —
 wörtlich, damit man vor dem Hochladen sieht, was er sehen wird.
 
 ```bash
-sh probe.sh              # Erkennung: welche Apps, welches Framework
-sh probe.sh analyse      # Vollanalyse: Variablen, Ports, Datenbanken
+sh probe.sh                                   # Erkennung: welche Apps
+printf 'apps/api-rust\n' | sh analyse.sh      # Vollanalyse einer Auswahl
 ```
+
+`analyse.sh` ist **wörtlich** aus `workbench/src/analyze.rs` kopiert
+(Stand `1dc9f9b`); nur der Tarball-Kopf fehlt, weil hier schon ein
+ausgepackter Baum liegt. `probe.sh analyse` tut dasselbe für alle
+erkannten Apps auf einmal.
 
 Die Quelle ist `Substrate/Raptor/crates/workbench/src/{detect,analyze}.rs`.
 Wer dort etwas ändert, muss es hier nachziehen — sonst prüft diese Probe

@@ -1,12 +1,13 @@
 //! Der Lese-Dienst.
 //!
 //! Ein Endpunkt, eine Datenbank, kein Zustand dazwischen. Was aus der
-//! Umgebung kommt, steht in `.env.example` — **und das ist hier kein
-//! Komfort, sondern eine Kruecke**: die Vollanalyse liest `.rs` nicht,
-//! sie sucht `process.env.X` und `os.environ['X']` in
-//! `*.js *.ts *.jsx *.tsx *.mjs *.py *.go *.env*`. Ohne die
-//! `.env.example` bliebe die Konfiguration dieses Dienstes unsichtbar,
-//! obwohl sie zwei Zeilen weiter unten steht.
+//! Umgebung kommt, steht zusaetzlich in `.env.example` — fuer Menschen,
+//! die den Dienst starten wollen, ohne den Quelltext zu lesen.
+//!
+//! Bis zum 22.08. fand die Vollanalyse hier gar nichts: sie durchsuchte
+//! keine `.rs`-Dateien. Der Dienst wurde als App erkannt und stand dann
+//! ohne eine einzige Variable da. Seit `env::var` in den Mustern steht,
+//! findet sie alle fuenf.
 
 use axum::{extract::State, routing::get, Json, Router};
 use serde::Serialize;
