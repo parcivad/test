@@ -62,10 +62,27 @@ Quelltext; die anderen drei kommen aus der `.env.example`.
 Angabe 3000, und diese Zahl steht nirgends im Repo. Was nicht
 dasteht, kann nicht gefunden werden.
 
-****Die Wurzel zählt mit.** Diese `package.json` macht das Repo zu einem
-npm-Workspace — und die Erkennung meldet die Wurzel deshalb als eigene
-App (`javascript`). Das ist kein Fehler, sondern die Regel: wo eine
-`package.json` liegt, ist eine App.
+****Die Wurzel zählt NICHT mehr mit.** Sie tat es bis zum 23.08.: diese
+`package.json` macht das Repo zu einem npm-Workspace, und die Erkennung
+meldete die Wurzel deshalb als neunte App. Weil die Oberfläche alle
+Funde vorauswählt, war sie angehakt — und die Vollanalyse geht rekursiv
+durch das gewählte Verzeichnis. Die Wurzel bekam dreizehn Variablen und
+drei Häfen zugeschrieben, von denen keiner einzigen ihr gehörte:
+
+```
+DATABASE_URL   ./services/api-python/api_python/server.py
+REDIS_URL      ./apps/tools-js/src/cli.js
+API_RUST_PORT  ./apps/api-rust/src/main.rs
+```
+
+Seit Raptor `70a310d` gilt: wo `"workspaces"` in der `package.json`
+steht oder eine `pnpm-workspace.yaml` daneben liegt, ist das der
+**Behälter** der Apps und nicht selbst eine. Kein Ratespiel — es steht
+da.
+
+Eine gewöhnliche App an der Wurzel wird weiterhin gemeldet, und ein
+Workspace ohne Kinder auch: gar nichts zu melden wäre schlechter als
+eine fragwürdige Wurzel.
 
 **Nur eine Ebene tief.** Gesucht wird in `apps packages services examples
 tools libs backend frontend`, jeweils direkt darunter. Ein
