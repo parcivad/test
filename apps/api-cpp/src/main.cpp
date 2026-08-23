@@ -44,6 +44,19 @@ std::string items(PGconn* db) {
     return antwort(200, json);
 }
 
+/// Nur die Zahl. Der Worker und api-python fragen danach — beide
+/// wollen zaehlen, keiner will die Liste.
+std::string zaehlwerk(PGconn* db) {
+    PGresult* r = PQexec(db, "select count(*) from items");
+    if (PQresultStatus(r) != PGRES_TUPLES_OK) {
+        PQclear(r);
+        return antwort(503, R"({"error":"database unavailable"})");
+    }
+    std::string n = PQntuples(r) > 0 ? PQgetvalue(r, 0, 0) : "0";
+    PQclear(r);
+    return antwort(200, R"({"count":)" + n + "}");
+}
+
 }  // namespace
 
 int main() {
@@ -89,9 +102,18 @@ int main() {
             auto b = zeile.find(' ', a + 1);
             if (a != std::string::npos && b != std::string::npos) pfad = zeile.substr(a + 1, b - a - 1);
         }
-        std::string out = pfad == "/health"  ? antwort(200, R"({"ok":true})")
-                          : pfad == "/items" ? items(db)
-                                             : antwort(404, R"({"error":"not found"})");
+        std::string out =
+            pfad == "/health"      ? antwort(200, R"({"ok":true,"service":"api-cpp"})")
+            // Wen dieser Dienst ruft — dieselbe Frage beantwortet jeder
+            // Dienst hier. Keinen: api-cpp ist ein Blatt am Ende der
+            // Kette, es spricht nur mit der Datenbank.
+            : pfad == "/topologie" ? antwort(200, R"({"service":"api-cpp","ruft":[)"
+                                             R"({"name":"postgres","url":"(DATABASE_URL)",)"
+                                             R"("warum":"Zaehlwerk"}],)"
+                                             R"("gerufen_von":["worker-ts","api-python"]})")
+            : pfad == "/count"     ? zaehlwerk(db)
+            : pfad == "/items"     ? items(db)
+                                   : antwort(404, R"({"error":"not found"})");
         write(c, out.data(), out.size());
         close(c);
     }

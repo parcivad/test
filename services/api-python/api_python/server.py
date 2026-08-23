@@ -14,6 +14,7 @@ import http.server
 import json
 import os
 import sys
+import urllib.request
 
 import psycopg
 
@@ -23,6 +24,8 @@ import psycopg
 DATABASE_URL = os.environ["DATABASE_URL"] if "DATABASE_URL" in os.environ else None
 PORT = int(os.environ["PYTHON_API_PORT"] if "PYTHON_API_PORT" in os.environ else "8084")
 LOG_LEVEL = os.environ["LOG_LEVEL"] if "LOG_LEVEL" in os.environ else "info"
+# Die eine Schwester, die dieser Dienst ruft.
+API_CPP_URL = os.environ["API_CPP_URL"] if "API_CPP_URL" in os.environ else "http://127.0.0.1:8083"
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -38,12 +41,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path == "/health":
             self._json(200, {"ok": True})
             return
+        if self.path == "/topologie":
+            # Wen dieser Dienst ruft — dieselbe Frage beantwortet jeder
+            # Dienst hier. Die Karte des Systems steht damit in den
+            # Diensten selbst, nicht nur in einer Zeichnung.
+            self._json(
+                200,
+                {
+                    "service": "api-python",
+                    "ruft": [
+                        {"name": "api-cpp", "url": API_CPP_URL, "warum": "Zaehlwerk gegenpruefen"},
+                        {"name": "postgres", "url": "(DATABASE_URL)", "warum": "eigene Zaehlung"},
+                    ],
+                    "gerufen_von": ["worker-ts"],
+                },
+            )
+            return
         if self.path == "/report":
             try:
                 with psycopg.connect(DATABASE_URL) as db, db.cursor() as cur:
                     cur.execute("select count(*) from items")
                     (anzahl,) = cur.fetchone()
-                self._json(200, {"items": anzahl})
+                # Gegenprobe beim C++-Zaehlwerk. Weichen die beiden ab,
+                # steht es DRIN statt dass eine Zahl gewinnt: zwei
+                # Quellen, die sich widersprechen, sind ein Befund.
+                gegen = None
+                try:
+                    with urllib.request.urlopen(f"{API_CPP_URL}/count", timeout=3) as r:
+                        gegen = json.loads(r.read()).get("count")
+                except Exception as e:  # noqa: BLE001 — jede Stoerung ist hier dasselbe
+                    if LOG_LEVEL == "debug":
+                        print(f"api-cpp: {e}", file=sys.stderr)
+                self._json(
+                    200,
+                    {
+                        "items": anzahl,
+                        "gegenprobe": gegen,
+                        "einig": None if gegen is None else gegen == anzahl,
+                    },
+                )
             except psycopg.Error as e:
                 if LOG_LEVEL == "debug":
                     print(e, file=sys.stderr)

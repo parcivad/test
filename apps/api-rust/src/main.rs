@@ -30,6 +30,17 @@ async fn health() -> &'static str {
     "ok"
 }
 
+/// Wen dieser Dienst ruft — dieselbe Frage beantwortet jeder Dienst
+/// hier. So steht die Karte des Systems in den Diensten selbst und
+/// nicht nur in einer Zeichnung, die veraltet.
+async fn topologie() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "service": "api-rust",
+        "ruft": [{"name": "postgres", "url": "(DATABASE_URL)", "warum": "Eintraege lesen"}],
+        "gerufen_von": ["worker-ts"]
+    }))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -57,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/topologie", get(topologie))
         .route("/items", get(items))
         .with_state(pool);
 

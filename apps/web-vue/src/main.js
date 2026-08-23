@@ -1,9 +1,14 @@
 import {createApp} from "vue"
 import App from "./App.vue"
 
-// Wohin diese Oberflaeche fragt. Ohne Vorgabe der Worker auf 8081 —
-// derselbe Wert wie in vite.config.js, damit ein Entwickler ohne
-// Umgebung trotzdem etwas sieht.
-const apiBase = process.env.VITE_API_BASE ?? "http://localhost:8081"
+/*
+ * Die Oberflaeche kennt GENAU EINEN Dienst: den Worker.
+ *
+ * Sie ruft nicht api-rust, api-cpp und api-python einzeln — die stehen
+ * im inneren Netz. Ein Browser, der sie direkt riefe, verlangte, sie
+ * nach aussen zu oeffnen und dort dreimal zu pruefen, was der Worker
+ * einmal prueft.
+ */
+const workerUrl = process.env.WORKER_URL ?? "http://127.0.0.1:8081"
 
-createApp(App, {apiBase}).mount("#app")
+createApp(App, {workerUrl}).mount("#app")

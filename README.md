@@ -3,16 +3,94 @@
 Ein Prüfstand für die Erkennung: acht Apps in sechs Sprachen, verteilt
 über die Verzeichnisse, in denen ein Monorepo sie üblicherweise ablegt.
 
-| Pfad | Sprache | Woran man es erkennt | Trägt |
-|---|---|---|---|
-| `apps/docs` | Next.js | `package.json` mit `next` | `NEXT_PUBLIC_SITE_URL` |
-| `apps/web-vue` | Vue 3 + Vite | `package.json` | `VITE_API_BASE`, Port 5173 |
-| `apps/worker-ts` | TypeScript | `package.json` | `DATABASE_URL`, Port 8081, Postgres (`pg`) |
-| `apps/tools-js` | JavaScript | `package.json` | `LOG_LEVEL`, Redis |
-| `apps/api-rust` | Rust | `Cargo.toml` | Port 8082, Postgres |
-| `apps/api-cpp` | C++ | `CMakeLists.txt` | Port 8083, Postgres |
-| `services/api-python` | Python | `pyproject.toml` | `PYTHON_API_PORT`, Port 8084 |
-| `packages/ui` | TypeScript | `package.json` | gemeinsame Komponenten |
+```
+                    ┌──────────────┐
+   Browser ────────▶│   web-vue    │  Vite, 5173
+                    └──────┬───────┘
+                           │  WORKER_URL
+                    ┌──────▼───────┐
+                    │  worker-ts   │  8081 — das Bindeglied
+                    └──┬────┬───┬──┘
+        API_RUST_URL   │    │   │   API_PYTHON_URL
+              ┌────────▼─┐  │   └────────────┐
+              │ api-rust │  │ API_CPP_URL    │
+              │   8082   │  │           ┌────▼───────┐
+              └────┬─────┘  │           │ api-python │
+                   │   ┌────▼────┐      │    8084    │
+                   │   │ api-cpp │◀─────┤            │
+                   │   │  8083   │      └────┬───────┘
+                   │   └────┬────┘           │
+                   └────────┴────────────────┘
+                            │
+                        Postgres
+
+   worker-ts ──▶ Redis ◀── tools-js   (Warteschlange)
+```
+
+| Pfad | Sprache | Hafen | Ruft | Gerufen von |
+|---|---|---|---|---|
+| `apps/web-vue` | Vue 3 + Vite | 5173 | worker-ts | Browser |
+| `apps/worker-ts` | TypeScript | 8081 | api-rust, api-cpp, api-python, Redis, Postgres | web-vue |
+| `apps/api-rust` | Rust + Axum | 8082 | Postgres | worker-ts |
+| `apps/api-cpp` | C++ + libpq | 8083 | Postgres | worker-ts, api-python |
+| `services/api-python` | Python | 8084 | api-cpp, Postgres | worker-ts |
+| `apps/tools-js` | JavaScript | 8085 | Redis, worker-ts | Mensch (CLI) |
+| `apps/docs` | Next.js | 3000 | — | Browser |
+| `packages/ui` | TypeScript | — | — | (Bibliothek) |
+
+## Wie das System zusammenhängt
+
+**Ein Bindeglied, nicht drei Wege aus dem Browser.** Die Oberfläche kennt
+genau einen Dienst. Die drei dahinter stehen im inneren Netz und haben
+keinen Grund, von außen erreichbar zu sein — wer sie direkt aus dem
+Browser riefe, müsste sie öffnen und dort dreimal prüfen, was der Worker
+einmal prüft.
+
+**Jede Schwester über ihre eigene Variable.** Kein abgeleiteter Name,
+kein „gleicher Host, anderer Port": in einer Zelle, in einem Container
+und auf einer Entwicklermaschine liegen sie an drei verschiedenen Orten,
+und nur die Umgebung weiß, wo. Deshalb `API_RUST_URL`, `API_CPP_URL`,
+`API_PYTHON_URL` — und dieselben Binärdateien überall.
+
+**Ein Teilausfall ist eine Antwort, kein Fehler.** Fällt eine Schwester
+aus, kommt die Übersicht trotzdem — das fehlende Feld auf `null`, der
+Name in `fehlend`. Nachgemessen mit abgeschossenem `api-cpp`:
+
+```
+alle drei da:              items=2  count=2     report=2  fehlend=[]
+nur api-cpp abgeschossen:  items=2  count=None  report=2  fehlend=['api-cpp']
+```
+
+Eine Oberfläche, die weiß *was* fehlt, kann es sagen. Eine, die nur eine
+Ausnahme bekommt, zeigt eine leere Seite.
+
+**Jeder Dienst beantwortet `/topologie`** — wen er ruft und von wem er
+gerufen wird. So steht die Karte in den Diensten selbst und nicht nur in
+der Zeichnung oben, die veraltet.
+
+### Was beim Bauen dieses Systems auffiel
+
+**Redis darf den Start nicht blockieren.** Der Worker hatte
+`await redis.connect()` vor `server.listen()`. Redis ist für ihn
+entbehrlich — ohne ihn bleibt nur die Nacharbeit liegen. Das `await`
+machte es doch unentbehrlich: der Client versucht es mit wachsenden
+Pausen weiter, das Versprechen löst sich nie auf, und `listen` wird nie
+erreicht. Der Prozess lief, der Hafen war zu, und im Protokoll stand
+**keine einzige Zeile** — auch `/health` antwortete nicht, das mit Redis
+nichts zu tun hat.
+
+## Starten
+
+```bash
+docker compose up --build
+curl localhost:8081/uebersicht
+curl localhost:8081/topologie
+open http://localhost:5173
+```
+
+`deploy/schema.sql` legt die Tabelle an, um die sich alles dreht. Sie
+liegt dort und nicht bei einem der vier Dienste, die sie lesen — sonst
+gäbe es vier Wahrheiten darüber, wie sie aussieht.
 
 ## Was dieser Prüfstand zutage gefördert hat
 
